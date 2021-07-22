@@ -10,6 +10,7 @@ module Cloudtruth
       include Runner
 
       def execute
+        logger.debug { self }
         use_cli(ENV['CT_CLI_OLD_PATH'] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
 
@@ -65,6 +66,7 @@ module Cloudtruth
         if @dry_run
           logger.info { "(DryRun) Skipping write of export data to '#{@data_file}':\n#{output}" }
         else
+          logger.info { "Writing export data to '#{@data_file}'" }
           File.write(@data_file, output)
         end
       end

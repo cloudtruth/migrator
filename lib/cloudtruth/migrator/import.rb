@@ -39,6 +39,7 @@ module Cloudtruth
       end
 
       def execute
+        logger.debug { self }
         use_cli(ENV['CT_CLI_NEW_PATH'] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
 
@@ -49,17 +50,15 @@ module Cloudtruth
         json = JSON.load(File.read(@data_file))
         logger.info { "Import integrations:" }
         logger.info { json['integration'].pretty_inspect }
-        puts
 
         integrations = JSON.parse(cloudtruth(*%w(integrations list --format json --values)))['integration'] rescue {}
         logger.info { "Existing integrations:" }
         logger.info { integrations.pretty_inspect }
-        puts
 
-        @integration_mapping = JSON.load(File.read("integration_mapping.json")) rescue {}
+        mappings_file = "#{File.dirname(@data_file)}/#{File.basename(@data_file, File.extname(@data_file))}-mapping.json"
+        @integration_mapping = JSON.load(File.read(mappings_file)) rescue {}
         logger.info { "Integration mappings:" }
         logger.info { @integration_mapping.pretty_inspect }
-        puts
 
         if json['integration'].size != integrations.size
           raise "Integration count mismatch, create integrations in UI before proceeding"
@@ -70,16 +69,17 @@ module Cloudtruth
             puts "Enter new FQN for the integration:"
             puts i
             print "FQN: "
-            fqn = gets.strip
+            fqn = $stdin.gets.strip
             fqn = fqn.gsub(%r{/+$}, "") # remove trailing slash
             @integration_mapping[i["FQN"]] = fqn
           end
 
           output = JSON.pretty_generate(@integration_mapping)
           if @dry_run
-            logger.info { "(DryRun) Skipping write of integration_mapping data: #{output}" }
+            logger.info { "(DryRun) Skipping write of integration_mapping data to '#{mappings_file}': #{output}" }
           else
-            File.write("integration_mapping.json", output)
+            logger.info { "Writing integration mapping data to '#{mappings_file}'" }
+            File.write(mappings_file, output)
           end
         end
 

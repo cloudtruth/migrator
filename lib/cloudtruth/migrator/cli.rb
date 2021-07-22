@@ -21,7 +21,7 @@ module Cloudtruth
 
       option "--data-file",
              'FILE', "The data file to export/import to/from",
-             default: "export.json"
+             default: "/data/export.json"
 
       subcommand "export", "Export data from old cloudtruth", Export
       subcommand "import", "Import data to new cloudtruth", Import
