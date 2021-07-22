@@ -6,7 +6,10 @@ ENV APP_DIR="/srv/app" \
     APP_PACKAGES="bash tzdata shared-mime-info" \
     APP_USER="app" \
     CT_CLI_OLD_VER="0.5.4" \
-    CT_CLI_NEW_VER="1.0.0_prerelease1"
+    CT_CLI_NEW_VER="1.0.0"
+
+ENV CT_CLI_OLD_PATH="/usr/local/bin/cloudtruth-${CT_CLI_OLD_VER}" \
+    CT_CLI_NEW_PATH="/usr/local/bin/cloudtruth-${CT_CLI_NEW_VER}"
 
 # Thes env var definitions reference values from the previous definitions, so
 # they need to be split off on their own. Otherwise, they'll receive stale
@@ -35,11 +38,11 @@ RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/downl
 RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_OLD_VER}
 RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh |  sh -s -- -v $CT_CLI_NEW_VER
 RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_NEW_VER}
-
+ENV OLD_CLI=
 COPY Gemfile* $APP_DIR/
 RUN bundle install --jobs=4
 
 COPY . $APP_DIR/
 
-ENTRYPOINT ["entrypoint.sh"]
-CMD ["-h"]
+ENTRYPOINT ["bundle", "exec", "cloudtruth-migrator"]
+CMD ["--help"]

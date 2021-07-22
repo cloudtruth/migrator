@@ -1,0 +1,18 @@
+version: "3.7"
+
+services:
+
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/data
+
+  migratordev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/srv/app
+      - .:/data

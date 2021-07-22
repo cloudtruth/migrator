@@ -1,18 +1,19 @@
 # Migrator
 
 ## Build It
-`docker build -t migrator .`
+`docker compose build`
+
+## Usage
+`docker compose run migrator --help`
 
 ## Export
 
-Writes cloudtruth data to `/data/export.json`:
+Writes cloudtruth data to `export.json`:
 
-`docker run -it -v $(pwd):. migrator -o old_api_key -n new_api_key export`
+`docker compose run migrator export --api-key old_api_key`
 
 ## Import
 
-Reads cloudtruth data from `/data/export.json`:
+Reads cloudtruth data from `export.json`:
 
-`docker run -it -v $(pwd):. migrator -o old_api_key -n new_api_key import`
-
-
+`docker compose run migrator import --api-key new_api_key`
