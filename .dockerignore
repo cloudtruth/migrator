@@ -1,0 +1,12 @@
+.git*
+Dockerfile
+pkg
+tmp
+.bundle
+.idea
+.codecov.yml
+coverage
+.dockerignore
+.rspec_status
+local
+*.json
