@@ -69,6 +69,8 @@ module Cloudtruth
           logger.info { "Writing export data to '#{@data_file}'" }
           File.write(@data_file, output)
         end
+
+        logger.info { "Export complete" }
       end
 
     end

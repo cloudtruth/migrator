@@ -113,7 +113,10 @@ module Cloudtruth
           end
 
         end
+
+        logger.info { "Import complete" }
       end
+
     end
 
   end
