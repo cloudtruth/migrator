@@ -38,7 +38,7 @@ RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/downl
 RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_OLD_VER}
 RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh |  sh -s -- -v $CT_CLI_NEW_VER
 RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_NEW_VER}
-ENV OLD_CLI=
+
 COPY Gemfile* $APP_DIR/
 RUN bundle install --jobs=4
 
