@@ -15,24 +15,39 @@ module Cloudtruth
       # github://dio-ct/cloud-management-integration/main/jmespath.json
       def convert_fqn(fqn)
         new_fqn = ""
-        parts = fqn.split("::")
-        base_fqn = parts[0..1].join('::')
-        new_base_fqn = @integration_mapping[base_fqn]
-        fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
 
-        case parts[0]
-          when /aws/i
-            type = parts[2].downcase
-            region = parts[3]
-            rest = parts[4..5]
-            new_fqn = "#{new_base_fqn}/#{region}/#{type}/?r=#{rest.join('/')}"
-          when /github/i
-            org, repo = parts[4].split('/')
-            branch = parts[5]
-            path = parts[6]
-            new_fqn = "#{new_base_fqn}/#{repo}/#{branch}/#{path}"
-          else
-            fail("Unknown integration")
+        if fqn =~ %r{^(\w+://[^/]*)/(.*)}
+          logger.debug { "FQN '#{fqn}' is in url form"}
+
+          base_fqn = $1
+          rest = $2
+          new_base_fqn = @integration_mapping[base_fqn]
+          fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
+
+          new_fqn = "#{new_base_fqn}/#{rest}"
+        else
+          logger.debug { "FQN '#{fqn}' is in legacy form"}
+
+          parts = fqn.split("::")
+          base_fqn = parts[0..1].join('::')
+          new_base_fqn = @integration_mapping[base_fqn]
+
+          fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
+
+          case parts[0]
+            when /aws/i
+              type = parts[2].downcase
+              region = parts[3]
+              rest = parts[4..5]
+              new_fqn = "#{new_base_fqn}/#{region}/#{type}/?r=#{rest.join('/')}"
+            when /github/i
+              org, repo = parts[4].split('/')
+              branch = parts[5]
+              path = parts[6]
+              new_fqn = "#{new_base_fqn}/#{repo}/#{branch}/#{path}"
+            else
+              fail("Unknown integration")
+          end
         end
 
         new_fqn
@@ -43,10 +58,6 @@ module Cloudtruth
         use_cli(ENV['CT_CLI_IMPORT_BINARY'] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
         set_continue_on_failure(@continue_on_failure)
-
-        if cloudtruth(*%w(--version)) !~ /1\.0/
-          fail("Import needs cloudtruth cli == 1.0.x")
-        end
 
         json = JSON.load(File.read(@data_file))
         logger.info { "Import integrations:" }

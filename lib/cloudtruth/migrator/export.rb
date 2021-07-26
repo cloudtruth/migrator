@@ -15,10 +15,6 @@ module Cloudtruth
         set_dry_run(@dry_run, %w[set unset delete])
         set_continue_on_failure(@continue_on_failure)
 
-        if cloudtruth(*%w(--version)) !~ /0\.5/
-          fail("Import needs cloudtruth cli == 0.5.x")
-        end
-
         json = {}
 
         logger.info { "Fetching integrations" }
