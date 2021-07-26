@@ -5,11 +5,11 @@ ENV APP_DIR="/srv/app" \
     BUILD_PACKAGES="build-base ruby-dev" \
     APP_PACKAGES="bash tzdata shared-mime-info" \
     APP_USER="app" \
-    CT_CLI_OLD_VER="0.5.4" \
-    CT_CLI_NEW_VER="1.0.0"
+    CT_CLI_EXPORT_VER="0.5.4" \
+    CT_CLI_IMPORT_VER="1.0.0"
 
-ENV CT_CLI_OLD_PATH="/usr/local/bin/cloudtruth-${CT_CLI_OLD_VER}" \
-    CT_CLI_NEW_PATH="/usr/local/bin/cloudtruth-${CT_CLI_NEW_VER}"
+ENV CT_CLI_EXPORT_BINARY="/usr/local/bin/cloudtruth-${CT_CLI_EXPORT_VER}" \
+    CT_CLI_IMPORT_BINARY="/usr/local/bin/cloudtruth-${CT_CLI_IMPORT_VER}"
 
 # Thes env var definitions reference values from the previous definitions, so
 # they need to be split off on their own. Otherwise, they'll receive stale
@@ -34,10 +34,10 @@ RUN apk add --no-cache \
     --virtual build_deps \
     $BUILD_PACKAGES
 
-RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh |  sh -s -- -v $CT_CLI_OLD_VER
-RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_OLD_VER}
-RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh |  sh -s -- -v $CT_CLI_NEW_VER
-RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_NEW_VER}
+RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh |  sh -s -- -v $CT_CLI_EXPORT_VER
+RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_EXPORT_VER}
+RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh |  sh -s -- -v $CT_CLI_IMPORT_VER
+RUN mv /usr/local/bin/cloudtruth /usr/local/bin/cloudtruth-${CT_CLI_IMPORT_VER}
 
 COPY Gemfile* $APP_DIR/
 RUN bundle install --jobs=4

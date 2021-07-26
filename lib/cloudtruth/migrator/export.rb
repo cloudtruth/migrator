@@ -11,54 +11,42 @@ module Cloudtruth
 
       def execute
         logger.debug { self }
-        use_cli(ENV['CT_CLI_OLD_PATH'] || "cloudtruth")
+        use_cli(ENV['CT_CLI_EXPORT_BINARY'] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
+        set_continue_on_failure(@continue_on_failure)
 
         if cloudtruth(*%w(--version)) !~ /0\.5/
-          raise "Import needs cloudtruth cli == 0.5.x"
+          fail("Import needs cloudtruth cli == 0.5.x")
         end
 
         json = {}
 
         logger.info { "Fetching integrations" }
-        integrations = JSON.parse(cloudtruth(*%w(integrations list --format json --values)))
-        json = json.merge(integrations)
+        json['integration'] = cloudtruth(*%w(integrations list --format json --values), json_key: 'integration')
 
         logger.info { "Fetching environments" }
-        environments=JSON.parse(cloudtruth(*%w(environments list --format json --values)))
-        json = json.merge(environments)
+        json['environment'] = cloudtruth(*%w(environments list --format json --values), json_key: 'environment')
 
         logger.info { "Fetching projects" }
-        projects=JSON.parse(cloudtruth(*%w(projects list --format json --values)))
-        json = json.merge(projects)
+        json['project'] = cloudtruth(*%w(projects list --format json --values), json_key: 'project')
 
-        envs = environments['environment'].collect {|e| e['Name'] }
+        envs = json['environment'].collect {|e| e['Name'] }
         json['project'].each do |project|
           envs.each do |env|
             project_name = project["Name"]
             logger.info { "Fetching parameters for project='#{project_name}' environment='#{env}'" }
 
-            begin
-              params=JSON.parse(cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --format json --values --secrets)))
-              params_dynamic=JSON.parse(cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --format json --values --secrets --dynamic)))
-              params_dynamic['parameter'].each do |pd|
-                found = params['parameter'].find {|p| p['Name'] == pd['Name'] }
-                found.merge!(pd) if found
-              end
-            rescue JSON::ParserError => e
-              case e.message
-              when /No dynamic parameters/
-                logger.info { "No dynamic parameters" }
-              when /No parameters found/
-                logger.info { "No parameters found" }
-                next
-              else
-                raise
-              end
+            params = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --format json --values --secrets), json_key: 'parameter', allow_empty: true)
+            next if params.nil?
+
+            params_dynamic = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --format json --values --secrets --dynamic), json_key: 'parameter', allow_empty: true)
+            Array(params_dynamic).each do |pd|
+              found = params.find {|p| p['Name'] == pd['Name'] }
+              found.merge!(pd) if found
             end
 
             project['parameter'] ||= {}
-            project['parameter'][env] = params['parameter']
+            project['parameter'][env] = params
           end
         end
 

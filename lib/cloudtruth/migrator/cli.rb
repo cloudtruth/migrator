@@ -23,6 +23,10 @@ module Cloudtruth
              'FILE', "The data file to export/import to/from",
              default: "/data/export.json"
 
+      option ["-c", "--continue-on-failure"],
+             :flag, "Continues when possible for a failure during export/import",
+             default: false
+
       subcommand "export", "Export data from old cloudtruth", Export
       subcommand "import", "Import data to new cloudtruth", Import
 

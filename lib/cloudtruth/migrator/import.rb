@@ -14,25 +14,25 @@ module Cloudtruth
       # GitHub::Darryl Diosomito::repositories::341583244::dio-ct/cloud-management-integration::main::jmespath.json
       # github://dio-ct/cloud-management-integration/main/jmespath.json
       def convert_fqn(fqn)
+        new_fqn = ""
         parts = fqn.split("::")
         base_fqn = parts[0..1].join('::')
         new_base_fqn = @integration_mapping[base_fqn]
-        raise "No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'" unless new_base_fqn
+        fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
 
         case parts[0]
           when /aws/i
             type = parts[2].downcase
             region = parts[3]
-            bucket = parts[4]
-            path = parts[5]
-            new_fqn = "#{new_base_fqn}/#{region}/#{type}/?r=#{bucket}/#{path}"
+            rest = parts[4..5]
+            new_fqn = "#{new_base_fqn}/#{region}/#{type}/?r=#{rest.join('/')}"
           when /github/i
             org, repo = parts[4].split('/')
             branch = parts[5]
             path = parts[6]
             new_fqn = "#{new_base_fqn}/#{repo}/#{branch}/#{path}"
           else
-            raise "Unknown integration"
+            fail("Unknown integration")
         end
 
         new_fqn
@@ -40,18 +40,19 @@ module Cloudtruth
 
       def execute
         logger.debug { self }
-        use_cli(ENV['CT_CLI_NEW_PATH'] || "cloudtruth")
+        use_cli(ENV['CT_CLI_IMPORT_BINARY'] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
+        set_continue_on_failure(@continue_on_failure)
 
         if cloudtruth(*%w(--version)) !~ /1\.0/
-          raise "Import needs cloudtruth cli == 1.0.x"
+          fail("Import needs cloudtruth cli == 1.0.x")
         end
 
         json = JSON.load(File.read(@data_file))
         logger.info { "Import integrations:" }
         logger.info { json['integration'].pretty_inspect }
 
-        integrations = JSON.parse(cloudtruth(*%w(integrations list --format json --values)))['integration'] rescue {}
+        integrations = cloudtruth(*%w(integrations list --format json --values), json_key: 'integration', allow_empty: true) || {}
         logger.info { "Existing integrations:" }
         logger.info { integrations.pretty_inspect }
 
@@ -61,7 +62,7 @@ module Cloudtruth
         logger.info { @integration_mapping.pretty_inspect }
 
         if json['integration'].size != integrations.size
-          raise "Integration count mismatch, create integrations in UI before proceeding"
+          fail("Integration count mismatch, create integrations in UI before proceeding")
         end
 
         if  json['integration'].size != @integration_mapping.size

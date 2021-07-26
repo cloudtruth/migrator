@@ -1,4 +1,5 @@
 require 'open3'
+require 'json'
 
 module Runner
   extend ActiveSupport::Concern
@@ -13,8 +14,32 @@ module Runner
     @triggers = triggers
   end
 
-  def cloudtruth(*cmd)
-    sh(*([@cli_path] + cmd))
+  def set_continue_on_failure(continue_on_failure)
+    @continue_on_failure = continue_on_failure
+  end
+
+  def fail(msg)
+    @continue_on_failure ? logger.error { msg } : raise(msg)
+  end
+
+  def cloudtruth(*cmd, json_key: nil, allow_empty: false)
+    result = nil
+    output = sh(*([@cli_path] + cmd))
+
+    if json_key
+      begin
+        parsed = JSON.parse(output)
+      rescue JSON::ParserError => e
+        logger.debug { "Failed to parse json: #{e.message}" }
+        parsed = {}
+      end
+      result = parsed[json_key]
+      fail("The json key '#{json_key}' is not present in the command output: #{output}") if result.nil? && ! allow_empty
+    else
+      result = output
+    end
+
+    result
   end
 
   def sh(*cmd)
@@ -27,7 +52,10 @@ module Runner
       output = result[0]
       status = result[1]
 
-      raise "Command failed: #{cmd.join(' ')}" unless status.success?
+      unless status.success?
+        fail("Command failed: #{cmd.join(' ')}")
+      end
+
     end
 
     return output
