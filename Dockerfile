@@ -6,7 +6,7 @@ ENV APP_DIR="/srv/app" \
     APP_PACKAGES="bash tzdata shared-mime-info" \
     APP_USER="app" \
     CT_CLI_EXPORT_VER="0.5.4" \
-    CT_CLI_IMPORT_VER="1.0.0"
+    CT_CLI_IMPORT_VER="1.0.1"
 
 ENV CT_CLI_EXPORT_BINARY="/usr/local/bin/cloudtruth-${CT_CLI_EXPORT_VER}" \
     CT_CLI_IMPORT_BINARY="/usr/local/bin/cloudtruth-${CT_CLI_IMPORT_VER}"
