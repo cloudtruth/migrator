@@ -12,10 +12,10 @@
 
 Writes cloudtruth data to `export.json`:
 
-`docker compose run --rm migrator export --api-key old_api_key`
+`docker compose run --rm migrator --api-key old_api_key export`
 
 ## Import
 
 Reads cloudtruth data from `export.json`:
 
-`docker compose run --rm migrator import --api-key new_api_key`
+`docker compose run --rm migrator --api-key new_api_key import`

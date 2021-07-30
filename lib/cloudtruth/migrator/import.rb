@@ -10,16 +10,16 @@ module Cloudtruth
       include Runner
 
       # AWS::ct-prod::S3::us-east-1::cloudtruth-s3::parameters/jmespath.json
-      # aws://ct-conserv-prod@943604981792/us-east-1/s3/?r=cloudtruth-s3/parameters/jmespath.json
-      # GitHub::Darryl Diosomito::repositories::341583244::dio-ct/cloud-management-integration::main::jmespath.json
-      # github://dio-ct/cloud-management-integration/main/jmespath.json
+      # aws://ct-conserv-prod@012345678912/us-east-1/s3/?r=cloudtruth-s3/parameters/jmespath.json
+      # GitHub::User Account::repositories::123456789::dio-ct/cloud-management-integration::main::jmespath.json
+      # github://github-account/cloud-management-integration/main/jmespath.json
       def convert_fqn(fqn)
         new_fqn = ""
 
         if fqn =~ %r{^(\w+://[^/]*)/(.*)}
           logger.debug { "FQN '#{fqn}' is in url form"}
 
-          base_fqn = $1
+          base_fqn = $1 + "/"
           rest = $2
           new_base_fqn = @integration_mapping[base_fqn]
           fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
@@ -78,7 +78,7 @@ module Cloudtruth
 
         if  json['integration'].size != @integration_mapping.size
           json['integration'].each do |i|
-            puts "Enter new FQN for the integration:"
+            puts "Enter new FQN for the integration (cloudtruth integrations explore -v):"
             puts i
             print "FQN: "
             fqn = $stdin.gets.strip
