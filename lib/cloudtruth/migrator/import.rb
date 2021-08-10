@@ -19,7 +19,7 @@ module Cloudtruth
         if fqn =~ %r{^(\w+://[^/]*)/(.*)}
           logger.debug { "FQN '#{fqn}' is in url form"}
 
-          base_fqn = $1 + "/"
+          base_fqn = $1
           rest = $2
           new_base_fqn = @integration_mapping[base_fqn]
           fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
@@ -83,7 +83,8 @@ module Cloudtruth
             print "FQN: "
             fqn = $stdin.gets.strip
             fqn = fqn.gsub(%r{/+$}, "") # remove trailing slash
-            @integration_mapping[i["FQN"]] = fqn
+            old_fqn = i["FQN"].gsub(%r{/+$}, "") # remove trailing slash
+            @integration_mapping[old_fqn] = fqn
           end
 
           output = JSON.pretty_generate(@integration_mapping)
