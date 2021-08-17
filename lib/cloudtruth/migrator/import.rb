@@ -97,7 +97,14 @@ module Cloudtruth
         end
 
         logger.info { "Creating environments" }
-        json['environment'].each do |env|
+        envs_by_parent = json['environment'].group_by {|e| e["Parent"] }
+        ordered_envs = envs_by_parent.delete("")
+        ordered_envs.each do |oe|
+          each_level_envs = envs_by_parent.delete(oe["Name"])
+          ordered_envs.concat(each_level_envs) if each_level_envs
+        end
+        logger.debug { "Environment creation order: #{ordered_envs.inspect}"}
+        ordered_envs.each do |env|
           logger.info { "Creating '#{env['Name']}'" }
           cloudtruth(*%W(environments set --desc #{env['Description']} --parent #{env['Parent']} #{env['Name']}))
         end
@@ -111,11 +118,14 @@ module Cloudtruth
             params.each do |param|
               if param['Source'] == env
                 logger.info { "Creating parameter name='#{param['Name']}' for env='#{env}'" }
-                cmd = %W(--project #{proj['Name']} --env #{env} parameter set --desc #{param['Description']} --secret #{param['Secret']})
+                cmd = %W(--project #{proj['Name']} --env #{env} parameter set --desc #{param['Description']})
                 if param['FQN'].nil? || param['FQN'].strip.size == 0
-                  cmd.concat  %W(--value #{param['Value']})
+                  cmd.concat  %W(--secret #{param['Secret']} --value #{param['Value']})
                 else
-                  cmd.concat %W(--fqn #{convert_fqn(param['FQN'])} --jmes #{param['JMES']})
+                  fqn = convert_fqn(param['FQN'])
+                  secret = param['Secret']
+                  secret = "true" if fqn =~ /^aws:/
+                  cmd.concat %W(--secret #{secret} --fqn #{fqn} --jmes #{param['JMES']})
                 end
                 cmd << param['Name']
                 cloudtruth(*cmd)
