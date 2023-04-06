@@ -3,6 +3,7 @@ version: "3.7"
 services:
 
   migrator:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -10,6 +11,7 @@ services:
       - .:/data
 
   migratordev:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
