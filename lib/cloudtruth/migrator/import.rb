@@ -112,7 +112,7 @@ module Cloudtruth
         logger.info { "Creating projects" }
         json['project'].each do |proj|
           logger.info { "Creating '#{proj['Name']}'" }
-          cloudtruth(*%W(projects set --desc #{proj['Description']} #{proj['Name']}))
+          cloudtruth(*%W(projects set --desc #{proj['Description']} --parent #{proj['Parent']} #{proj['Name']}))
 
           (proj['parameter'] || {}).each do |env, params|
             params.each do |param|

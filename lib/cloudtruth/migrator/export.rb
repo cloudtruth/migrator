@@ -32,13 +32,19 @@ module Cloudtruth
             project_name = project["Name"]
             logger.info { "Fetching parameters for project='#{project_name}' environment='#{env}'" }
 
-            params = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --format json --values --secrets), json_key: 'parameter', allow_empty: true)
+            params = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --immediate_parameters --format json --values --secrets), json_key: 'parameter', allow_empty: true)
             next if params.nil?
 
-            params_dynamic = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --format json --values --secrets --dynamic), json_key: 'parameter', allow_empty: true)
+            params_dynamic = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --immediate_parameters --format json --values --secrets --dynamic), json_key: 'parameter', allow_empty: true)
             Array(params_dynamic).each do |pd|
               found = params.find {|p| p['Name'] == pd['Name'] }
               found.merge!(pd) if found
+            end
+
+            params_evaluated = cloudtruth(*%W(--project #{project_name} --env #{env} parameters list --immediate_parameters --format json --values --secrets --evaluated), json_key: 'parameter', allow_empty: true)
+            Array(params_evaluated).each do |pe|
+              found = params.find {|p| p['Name'] == pe['Name'] }
+              found.merge!(pe) if found
             end
 
             project['parameter'] ||= {}
