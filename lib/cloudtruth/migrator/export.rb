@@ -13,6 +13,7 @@ module Cloudtruth
         logger.debug { self }
         use_cli(ENV['CT_CLI_EXPORT_BINARY'] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
+        set_data_file(@data_file)
         set_continue_on_failure(@continue_on_failure)
 
         json = {}
