@@ -18,6 +18,10 @@ module Runner
     @continue_on_failure = continue_on_failure
   end
 
+  def set_data_file(data_file)
+    @data_file = data_file
+  end
+
   def fail(msg)
     @continue_on_failure ? logger.error { msg } : raise(msg)
   end
@@ -58,7 +62,7 @@ module Runner
 
     end
 
-    return output
+    output
   end
 
 end

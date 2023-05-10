@@ -1,6 +1,7 @@
-require 'json'
-require 'pp'
-require_relative 'runner'
+require "json"
+require "pp"
+require "tempfile"
+require_relative "runner"
 
 module Cloudtruth
   module Migrator
@@ -9,138 +10,143 @@ module Cloudtruth
       include GemLogger::LoggerSupport
       include Runner
 
-      # AWS::ct-prod::S3::us-east-1::cloudtruth-s3::parameters/jmespath.json
-      # aws://ct-conserv-prod@012345678912/us-east-1/s3/?r=cloudtruth-s3/parameters/jmespath.json
-      # GitHub::User Account::repositories::123456789::dio-ct/cloud-management-integration::main::jmespath.json
-      # github://github-account/cloud-management-integration/main/jmespath.json
-      def convert_fqn(fqn)
-        new_fqn = ""
+      def create_project_parameters(projects, skip_integrations)
+        projects_with_errors = []
 
-        if fqn =~ %r{^(\w+://[^/]*)/(.*)}
-          logger.debug { "FQN '#{fqn}' is in url form"}
+        projects.each do |proj|
+          proj["parameters"].values.each do |param|
+            param["values"].values.each do |param_value|
+              logger.info { "Creating parameter name='#{param["name"]}' for env='#{param_value["environment"]}'" }
+              cmd = %W(
+                --project #{proj["name"]}
+                --env #{param_value["environment"]}
+                parameter set
+                --evaluate #{param_value["evaluated"]}
+              )
 
-          base_fqn = $1
-          rest = $2
-          new_base_fqn = @integration_mapping[base_fqn]
-          fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
+              if param.include?('description') && !param['description'].strip.empty?
+                cmd.concat %W(--desc #{param["description"]})
+              end
 
-          new_fqn = "#{new_base_fqn}/#{rest}"
-        else
-          logger.debug { "FQN '#{fqn}' is in legacy form"}
+              if param_value["external"].nil?
+                cmd.concat %W(--secret #{param["secret"]} --value #{param_value["value"]})
+              else
+                if skip_integrations
+                  logger.warn "Skipping external value: #{param_value.inspect}"
+                  next
+                end
+                fqn = param_value["external"]["fqn"]
+                jmes = param_value["external"]["jmes_path"]
+                secret = param["secret"]
+                secret = "true" if fqn =~ /^aws:/
+                cmd.concat %W(--secret #{secret} --fqn #{fqn})
+                cmd.concat %W(--jmes #{jmes}) if jmes
+              end
 
-          parts = fqn.split("::")
-          base_fqn = parts[0..1].join('::')
-          new_base_fqn = @integration_mapping[base_fqn]
-
-          fail("No fqn mapping from '#{base_fqn}' => '#{new_base_fqn}'") unless new_base_fqn
-
-          case parts[0]
-            when /aws/i
-              type = parts[2].downcase
-              region = parts[3]
-              rest = parts[4..5]
-              new_fqn = "#{new_base_fqn}/#{region}/#{type}/?r=#{rest.join('/')}"
-            when /github/i
-              org, repo = parts[4].split('/')
-              branch = parts[5]
-              path = parts[6]
-              new_fqn = "#{new_base_fqn}/#{repo}/#{branch}/#{path}"
-            else
-              fail("Unknown integration")
+              cmd << param["name"]
+              begin
+                cloudtruth(*cmd)
+              rescue StandardError => se
+                projects_with_errors.append(proj)
+                logger.warn { "Caught: #{se.message}" }
+              end
+            end
           end
         end
+        if projects_with_errors.size > 0
+          logger.warn { "Failed to import all parameters. Retrying #{projects_with_errors.size} parameters"}
+          create_project_parameters(projects_with_errors, skip_integrations)
+        end
+      end
 
-        new_fqn
+      def create_project_templates(projects)
+        projects.each do |project|
+          project["templates"].values.each do |tmpl|
+            logger.info { "Creating template name='#{tmpl["name"]}'" }
+            Tempfile.create("import-tmpl") do |file|
+              file.write(tmpl["text"])
+              file.flush
+
+              cmd = %W(--project #{project["name"]} template set)
+              if tmpl.include?('description') && (!tmpl['description'].nil? && !tmpl['description'].strip.empty?)
+                cmd.concat %W(--desc #{tmpl["description"]})
+              end
+              cmd.concat %W(--body #{file.path} #{tmpl["name"]})
+              cloudtruth(*cmd)
+            end
+          end
+        end
       end
 
       def execute
         logger.debug { self }
-        use_cli(ENV['CT_CLI_IMPORT_BINARY'] || "cloudtruth")
+        use_cli(ENV["CT_CLI_IMPORT_BINARY"] || "cloudtruth")
         set_dry_run(@dry_run, %w[set unset delete])
         set_continue_on_failure(@continue_on_failure)
+        set_data_file(@data_file)
 
+        logger.info { "Reading exported file: #{@data_file}" }
         json = JSON.load(File.read(@data_file))
-        logger.info { "Import integrations:" }
-        logger.info { json['integration'].pretty_inspect }
 
-        integrations = cloudtruth(*%w(integrations list --format json --values), json_key: 'integration', allow_empty: true) || {}
-        logger.info { "Existing integrations:" }
-        logger.info { integrations.pretty_inspect }
+        logger.info { "Checking for integrations" }
+        skip_integrations = false
+        integrations = cloudtruth(*%w(integrations list --format json --values), json_key: "integration", allow_empty: true) || {}
+        missing = json["integrations"].collect { |i| i["FQN"] }.sort - integrations.collect { |i| i["FQN"] }.sort
+        if missing.size > 0
+          logger.info { "Import integrations:" }
+          logger.info { json["integrations"].pretty_inspect }
 
-        mappings_file = "#{File.dirname(@data_file)}/#{File.basename(@data_file, File.extname(@data_file))}-mapping.json"
-        @integration_mapping = JSON.load(File.read(mappings_file)) rescue {}
-        logger.info { "Integration mappings:" }
-        logger.info { @integration_mapping.pretty_inspect }
+          logger.info { "Existing integrations:" }
+          logger.info { integrations.pretty_inspect }
 
-        if json['integration'].size != integrations.size
-          fail("Integration count mismatch, create integrations in UI before proceeding")
-        end
-
-        if  json['integration'].size != @integration_mapping.size
-          json['integration'].each do |i|
-            puts "Enter new FQN for the integration (cloudtruth integrations explore -v):"
-            puts i
-            print "FQN: "
-            fqn = $stdin.gets.strip
-            fqn = fqn.gsub(%r{/+$}, "") # remove trailing slash
-            old_fqn = i["FQN"].gsub(%r{/+$}, "") # remove trailing slash
-            @integration_mapping[old_fqn] = fqn
-          end
-
-          output = JSON.pretty_generate(@integration_mapping)
-          if @dry_run
-            logger.info { "(DryRun) Skipping write of integration_mapping data to '#{mappings_file}': #{output}" }
-          else
-            logger.info { "Writing integration mapping data to '#{mappings_file}'" }
-            File.write(mappings_file, output)
-          end
+          logger.warn { "Integrations missing in destination, skipping any values that use them" }
+          skip_integrations = true
         end
 
         logger.info { "Creating environments" }
-        envs_by_parent = json['environment'].group_by {|e| e["Parent"] }
-        ordered_envs = envs_by_parent.delete("")
+        envs_by_parent = json["environments"].values.group_by { |e| e["parent"] }
+        ordered_envs = envs_by_parent.delete(nil)
         ordered_envs.each do |oe|
-          each_level_envs = envs_by_parent.delete(oe["Name"])
+          each_level_envs = envs_by_parent.delete(oe["name"])
           ordered_envs.concat(each_level_envs) if each_level_envs
         end
-        logger.debug { "Environment creation order: #{ordered_envs.inspect}"}
+
+        logger.debug { "Environment creation order: #{ordered_envs.inspect}" }
         ordered_envs.each do |env|
-          logger.info { "Creating '#{env['Name']}'" }
-          cloudtruth(*%W(environments set --desc #{env['Description']} --parent #{env['Parent']} #{env['Name']}))
+          logger.info { "Creating '#{env["name"]}'" }
+          cmd = %W(environments set --parent #{env["parent"]} #{env["name"]})
+          if env.include?('description') && !env['description'].strip.empty?
+            cmd.concat %W(--desc #{env["description"]})
+          end
+          cloudtruth(*cmd)
         end
 
         logger.info { "Creating projects" }
-        json['project'].each do |proj|
-          logger.info { "Creating '#{proj['Name']}'" }
-          cloudtruth(*%W(projects set --desc #{proj['Description']} --parent #{proj['Parent']} #{proj['Name']}))
-
-          (proj['parameter'] || {}).each do |env, params|
-            params.each do |param|
-              if param['Source'] == env
-                logger.info { "Creating parameter name='#{param['Name']}' for env='#{env}'" }
-                cmd = %W(--project #{proj['Name']} --env #{env} parameter set --desc #{param['Description']})
-                if param['FQN'].nil? || param['FQN'].strip.size == 0
-                  cmd.concat  %W(--secret #{param['Secret']} --value #{param['Value']})
-                else
-                  fqn = convert_fqn(param['FQN'])
-                  secret = param['Secret']
-                  secret = "true" if fqn =~ /^aws:/
-                  cmd.concat %W(--secret #{secret} --fqn #{fqn} --jmes #{param['JMES']})
-                end
-                cmd << param['Name']
-                cloudtruth(*cmd)
-              else
-                logger.info { "Param value for '#{param['Name']}' doesn't exist in for env='#{env}'" }
-              end
-            end
-          end
-
+        projects_by_parent = json["projects"].values.group_by { |e| e["parent"] }
+        ordered_projects = projects_by_parent.delete(nil)
+        ordered_projects.each do |oe|
+          each_level_projects = projects_by_parent.delete(oe["name"])
+          ordered_projects.concat(each_level_projects) if each_level_projects
         end
+        logger.debug { "Project creation order: #{ordered_projects.inspect}" }
+
+        ordered_projects.each do |proj|
+          logger.info { "Creating '#{proj["name"]}'" }
+          cmd = %W(projects set)
+          if proj.include?('description') && !proj['description'].strip.empty?
+            cmd.concat %W(--desc #{proj["description"]})
+          end
+          cmd.concat %W(--parent #{proj["parent"]}) if proj["parent"]
+          cmd << proj["name"]
+          cloudtruth(*cmd)
+        end
+
+        create_project_parameters(ordered_projects, skip_integrations)
+        create_project_templates(ordered_projects)
 
         logger.info { "Import complete" }
       end
 
     end
-
   end
 end
