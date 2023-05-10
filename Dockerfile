@@ -31,7 +31,6 @@ RUN apk add --no-cache \
 
 ## Install latest CLI
 RUN wget -qO- https://github.com/cloudtruth/cloudtruth-cli/releases/latest/download/install.sh | sh
-RUN mv /usr/local/bin/cloudtruth /usr/local/bin/
 
 COPY Gemfile* $APP_DIR/
 RUN bundle install --jobs=4
