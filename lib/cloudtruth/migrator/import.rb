@@ -91,7 +91,7 @@ module Cloudtruth
         logger.info { "Checking for integrations" }
         skip_integrations = false
         integrations = cloudtruth(*%w(integrations list --format json --values), json_key: "integration", allow_empty: true) || {}
-        missing = json["integrations"].collect { |i| i["FQN"] }.sort - integrations.collect { |i| i["FQN"] }.sort
+        missing = (json["integrations"] || {}).collect { |i| i["FQN"] }.sort - integrations.collect { |i| i["FQN"] }.sort
         if missing.size > 0
           logger.info { "Import integrations:" }
           logger.info { json["integrations"].pretty_inspect }

@@ -22,7 +22,7 @@ module Cloudtruth
         json = JSON.parse(cloudtruth(*%w(backup snapshot --yes --format json)))
 
         logger.info { "Fetching integrations" }
-        json['integrations'] = cloudtruth(*%w(integrations list --format json --values), json_key: 'integration')
+        json['integrations'] = cloudtruth(*%w(integrations list --format json --values), json_key: 'integration', allow_empty: true) || {}
 
         output = JSON.pretty_generate(json)
         if @dry_run
